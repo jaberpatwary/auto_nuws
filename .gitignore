@@ -1,0 +1,10 @@
+/server
+*.exe
+server.exe
+/tmp
+*.log
+.DS_Store
+vendor/
+.env
+.env.*
+!.env.example

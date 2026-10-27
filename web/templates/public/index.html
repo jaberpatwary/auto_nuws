@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>বাংলা নিউজ | সর্বশেষ সংবাদ</title>
+  <meta name="description" content="বাংলাদেশের সর্বশেষ সংবাদ। RSS উৎস থেকে স্বয়ংক্রিয়ভাবে সংগৃহীত ও AI-সংক্ষেপিত সংবাদ।">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Noto+Serif+Bengali:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- ── Top utility bar ──────────────────────────────── -->
+  <div class="site-topbar">
+    <div class="wrap">
+      <div class="topbar-ticker">
+        <span class="label">আজকের দিন</span>
+        <span class="text">{{ todayBanglaDate }} | ঢাকা সংস্করণ</span>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-live" id="liveBadge" title="প্রতি ১০ মিনিট পর পর পাতাটি স্বয়ংক্রিয়ভাবে নতুন সংবাদ দিয়ে হালনাগাদ হবে">
+          <span class="live-dot"></span>
+          <span class="live-label">লাইভ: <span id="autoUpdateCountdown">১০:০০</span></span>
+          <button id="manualRefreshBtn" class="live-refresh-btn" title="এখনই নতুন সংবাদ খুঁজুন" type="button">🔄</button>
+        </div>
+        <span style="color:#ddd;">|</span>
+        <a href="/admin/login">অ্যাডমিন লগইন</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Floating Live Toast ────────────────────────────── -->
+  <div id="liveToast" class="live-toast" role="status" aria-live="polite">
+    <span class="toast-icon">✨</span>
+    <span id="toastMsg" class="toast-text">নতুন সংবাদ হালনাগাদ হয়েছে!</span>
+    <button type="button" id="toastBtn" class="toast-action-btn" onclick="scrollToTopFeed()">দেখুন</button>
+  </div>
+
+  <!-- ── Header ────────────────────────────────────────── -->
+  <header class="site-header">
+    <div class="wrap site-masthead">
+      <div class="masthead-left">
+        <button class="hamburger-btn" id="menuToggle" aria-label="মেনু খুলুন" type="button">☰</button>
+      </div>
+
+      <a href="/" class="site-brand" aria-label="বাংলা নিউজ হোম">
+        <span class="sun">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="12" y1="21" x2="12" y2="23" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="1" y1="12" x2="3" y2="12" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="21" y1="12" x2="23" y2="12" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        বাংলা নিউজ
+      </a>
+
+      <div class="masthead-right">
+        <button class="header-btn search" id="searchToggle" aria-label="খুঁজুন">⌕</button>
+        <a href="/admin/login" class="header-btn">অ্যাডমিন</a>
+      </div>
+    </div>
+
+    <!-- Category nav -->
+    <nav class="site-nav" id="mainNav" aria-label="সংবাদ বিভাগ">
+      <div class="wrap">
+        <a href="/"                          {{ if eq .Category "" }}class="active"{{ end }}>সর্বশেষ</a>
+        <a href="/?category=bangladesh"      {{ if eq .Category "bangladesh" }}class="active"{{ end }}>বাংলাদেশ</a>
+        <a href="/?category=international"   {{ if eq .Category "international" }}class="active"{{ end }}>বিশ্ব</a>
+        <a href="/?category=business"        {{ if eq .Category "business" }}class="active"{{ end }}>ব্যবসা</a>
+        <a href="/?category=sports"          {{ if eq .Category "sports" }}class="active"{{ end }}>খেলা</a>
+        <a href="/?category=entertainment"   {{ if eq .Category "entertainment" }}class="active"{{ end }}>বিনোদন</a>
+        <a href="/?category=technology"      {{ if eq .Category "technology" }}class="active"{{ end }}>প্রযুক্তি</a>
+        <a href="/?category=general"         {{ if eq .Category "general" }}class="active"{{ end }}>সাধারণ</a>
+      </div>
+    </nav>
+
+    <!-- Quick search dropdown -->
+    <div id="searchDropdown" style="display:none; background:#fafafa; border-bottom:1px solid #e0e0e0; padding:12px 0;">
+      <div class="wrap">
+        <form onsubmit="handleSearch(event)" style="display:flex; gap:8px; max-width:600px; margin:0 auto;">
+          <input type="text" id="quickSearchInput" placeholder="শিরোনাম বা বিষয় খুঁজুন..." style="flex:1; padding:8px 14px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px;">
+          <button type="submit" class="header-btn" style="background:var(--red); color:#fff; border-color:var(--red); font-weight:600; padding:0 18px;">অনুসন্ধান</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main ──────────────────────────────────────────── -->
+  <main class="site-main">
+    <div class="wrap">
+
+      <!-- Latest bar -->
+      <div class="latest-bar">
+        <span class="pill">সর্বশেষ</span>
+        {{ if ne .Category "" }}
+          <strong>{{ .Category }}</strong> বিভাগ ·
+        {{ end }}
+        <span class="sub">স্বয়ংক্রিয় RSS সংগ্রহ ও AI সংক্ষেপ</span>
+      </div>
+
+      {{ if eq (len .Articles) 0 }}
+        <div class="empty-feed">
+          <div class="icon">📰</div>
+          <p>এই বিভাগে এখনো কোনো সংবাদ পাওয়া যায়নি।<br>ফিড ওয়ার্কার চালু হলেই সংবাদ দেখা যাবে।</p>
+        </div>
+      {{ else }}
+
+        <!-- Feed layout: stream + sidebar -->
+        <div class="feed-layout">
+
+          <!-- Left: news stream -->
+          <div class="news-stream">
+
+            {{ range $i, $a := .Articles }}
+
+              {{ if eq $i 0 }}
+              <!-- Hero / Lead story -->
+              <div class="stream-hero">
+                <div class="hero-copy">
+                  <span class="kicker">{{ $a.SourceName }}</span>
+                  <h2><a href="/article/{{ $a.ID }}">{{ $a.Title }}</a></h2>
+                  {{ if $a.Summary }}
+                    <p class="excerpt">{{ stripHTML $a.Summary }}</p>
+                  {{ end }}
+                  <time datetime="{{ $a.PublishedAt.Format "2006-01-02T15:04:05Z07:00" }}">🕒 {{ banglaTimeAgo $a.PublishedAt }} · {{ banglaDateTime $a.PublishedAt }}</time>
+                </div>
+                {{ if $a.ImageURL }}
+                <a href="/article/{{ $a.ID }}" class="hero-img">
+                  <img src="{{ $a.ImageURL }}" alt="{{ $a.Title }}" loading="lazy">
+                </a>
+                {{ end }}
+              </div>
+
+              {{ else if lt $i 8 }}
+              <!-- Standard stream item with image -->
+              <div class="stream-item">
+                <div class="item-copy">
+                  <span class="src-tag">{{ $a.SourceName }}</span>
+                  <h3><a href="/article/{{ $a.ID }}">{{ $a.Title }}</a></h3>
+                  <time datetime="{{ $a.PublishedAt.Format "2006-01-02T15:04:05Z07:00" }}">🕒 {{ banglaTimeAgo $a.PublishedAt }} · {{ banglaDateTime $a.PublishedAt }}</time>
+                </div>
+                {{ if $a.ImageURL }}
+                <a href="/article/{{ $a.ID }}" class="item-img">
+                  <img src="{{ $a.ImageURL }}" alt="{{ $a.Title }}" loading="lazy">
+                </a>
+                {{ end }}
+              </div>
+
+              {{ else }}
+              <!-- Compact text item -->
+              <div class="stream-text-item">
+                <span class="src-tag">{{ $a.SourceName }}</span>
+                <h3><a href="/article/{{ $a.ID }}">{{ $a.Title }}</a></h3>
+                <time datetime="{{ $a.PublishedAt.Format "2006-01-02T15:04:05Z07:00" }}">🕒 {{ banglaTimeAgo $a.PublishedAt }} · {{ banglaDateTime $a.PublishedAt }}</time>
+              </div>
+              {{ end }}
+
+            {{ end }}
+
+            <!-- Pagination -->
+            <nav class="load-more-wrap" aria-label="পৃষ্ঠা পরিবর্তন">
+              {{ if gt .Page 1 }}
+                <a class="load-more-btn" href="/?page={{ sub .Page 1 }}&category={{ .Category }}" style="margin-right:10px;">← আগের পৃষ্ঠা</a>
+              {{ end }}
+              <a class="load-more-btn" href="/?page={{ add .Page 1 }}&category={{ .Category }}">পরের পৃষ্ঠা →</a>
+            </nav>
+          </div>
+
+          <!-- Right: sidebar -->
+          <aside class="sidebar">
+            <div class="sidebar-box">
+              <div class="box-header">
+                <h3>সর্বাধিক পঠিত</h3>
+              </div>
+              <div class="sidebar-trending">
+                {{ range $i, $a := .Articles }}
+                  {{ if lt $i 7 }}
+                  <a href="/article/{{ $a.ID }}">
+                    <span class="num">{{ banglaDigits (printf "%d" (add $i 1)) }}</span>
+                    <span class="title">{{ $a.Title }}</span>
+                  </a>
+                  {{ end }}
+                {{ end }}
+              </div>
+            </div>
+
+            <div class="sidebar-promo">
+              <div class="promo-title">আমাদের অ্যাপ ডাউনলোড করুন</div>
+              <div class="promo-app">বাংলা নিউজ<br>সর্বত্র আপনার সাথে</div>
+              <span class="promo-btn">আরও জানুন</span>
+            </div>
+          </aside>
+
+        </div><!-- /.feed-layout -->
+
+        <!-- ── Below-the-fold card grid ───────────────── -->
+        {{ if gt (len .Articles) 8 }}
+        <section style="margin-top: 40px;">
+          <div class="section-bar">
+            <h2>আরও সংবাদ</h2>
+            <a href="/">সব দেখুন →</a>
+          </div>
+          <div class="card-grid">
+            {{ range $i, $a := .Articles }}
+              {{ if ge $i 8 }}
+              <article class="news-card">
+                {{ if $a.ImageURL }}
+                <a href="/article/{{ $a.ID }}" class="card-img">
+                  <img src="{{ $a.ImageURL }}" alt="{{ $a.Title }}" loading="lazy">
+                </a>
+                {{ else }}
+                <a href="/article/{{ $a.ID }}" class="card-img card-placeholder">
+                  <div class="placeholder-tag">{{ $a.SourceName }}</div>
+                  <span class="placeholder-icon">📰</span>
+                </a>
+                {{ end }}
+                <div class="card-body">
+                  <span class="src-tag">{{ $a.SourceName }}</span>
+                  <h3><a href="/article/{{ $a.ID }}">{{ $a.Title }}</a></h3>
+                  <time>🕒 {{ banglaTimeAgo $a.PublishedAt }} · {{ banglaDateTime $a.PublishedAt }}</time>
+                </div>
+              </article>
+              {{ end }}
+            {{ end }}
+          </div>
+        </section>
+        {{ end }}
+
+      {{ end }}
+    </div>
+  </main>
+
+  <!-- ── Footer ────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-top">
+        <div>
+          <div class="footer-brand">বাংলা<span class="dot">●</span>নিউজ</div>
+          <p class="footer-tagline">বাংলাদেশের শীর্ষ সংবাদমাধ্যম থেকে স্বয়ংক্রিয়ভাবে সংগৃহীত ও AI-সংক্ষেপিত সর্বশেষ সংবাদ।</p>
+          <div class="footer-social">
+            <a href="#" aria-label="Facebook">f</a>
+            <a href="#" aria-label="Twitter/X">𝕏</a>
+            <a href="#" aria-label="YouTube">▶</a>
+            <a href="#" aria-label="Instagram">◉</a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4>বিভাগ</h4>
+          <ul>
+            <li><a href="/?category=bangladesh">বাংলাদেশ</a></li>
+            <li><a href="/?category=international">বিশ্ব</a></li>
+            <li><a href="/?category=business">ব্যবসা</a></li>
+            <li><a href="/?category=sports">খেলা</a></li>
+            <li><a href="/?category=entertainment">বিনোদন</a></li>
+            <li><a href="/?category=technology">প্রযুক্তি</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>সাইট তথ্য</h4>
+          <ul>
+            <li><a href="/health">Health Check</a></li>
+            <li><a href="/admin/login">অ্যাডমিন লগইন</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© বাংলা নিউজ · RSS উৎস থেকে AI-চালিত সংবাদ সংক্ষেপ</span>
+        <div>
+          <a href="#">গোপনীয়তা নীতি</a>
+          <a href="#">যোগাযোগ</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Search dropdown toggle
+    const searchToggle = document.getElementById('searchToggle');
+    const searchDropdown = document.getElementById('searchDropdown');
+    const quickSearchInput = document.getElementById('quickSearchInput');
+
+    if (searchToggle && searchDropdown) {
+      searchToggle.addEventListener('click', () => {
+        const isHidden = searchDropdown.style.display === 'none';
+        searchDropdown.style.display = isHidden ? 'block' : 'none';
+        if (isHidden && quickSearchInput) {
+          quickSearchInput.focus();
+        }
+      });
+    }
+
+    function handleSearch(e) {
+      e.preventDefault();
+      const val = (quickSearchInput ? quickSearchInput.value : '').trim().toLowerCase();
+      if (!val) return;
+      // In-page filter headlines
+      const articles = document.querySelectorAll('.stream-item, .stream-text-item, .news-card, .stream-hero');
+      let found = 0;
+      articles.forEach(el => {
+        const text = el.innerText.toLowerCase();
+        if (text.includes(val)) {
+          el.style.display = '';
+          found++;
+        } else {
+          el.style.display = 'none';
+        }
+      });
+      if (found === 0) {
+        alert('"' + val + '" সম্পর্কিত কোনো সংবাদ খুঁজে পাওয়া যায়নি।');
+      }
+    }
+
+    // Mobile nav toggle
+    const menuToggle = document.getElementById('menuToggle');
+    const mainNav = document.getElementById('mainNav');
+    if (menuToggle && mainNav) {
+      menuToggle.addEventListener('click', () => {
+        mainNav.classList.toggle('nav-open');
+      });
+    }
+
+    // ── Live Auto-Update System (প্রতি ১০ মিনিট পর পর রিলোড ছাড়াই হালনাগাদ) ──
+    const AUTO_UPDATE_INTERVAL = 10 * 60; // 10 minutes (600s)
+    const SILENT_CHECK_INTERVAL = 60 * 1000; // Check every 60s for new news
+    let remainingSeconds = AUTO_UPDATE_INTERVAL;
+
+    const countdownEl = document.getElementById('autoUpdateCountdown');
+    const manualRefreshBtn = document.getElementById('manualRefreshBtn');
+    const liveToast = document.getElementById('liveToast');
+    const toastMsg = document.getElementById('toastMsg');
+    const toastBtn = document.getElementById('toastBtn');
+
+    function toBanglaDigits(str) {
+      const bn = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+      return String(str).replace(/[0-9]/g, d => bn[d]);
+    }
+
+    function updateCountdownDisplay() {
+      if (!countdownEl) return;
+      const m = Math.floor(remainingSeconds / 60);
+      const s = remainingSeconds % 60;
+      const mStr = (m < 10 ? '0' : '') + m;
+      const sStr = (s < 10 ? '0' : '') + s;
+      countdownEl.textContent = toBanglaDigits(mStr + ':' + sStr);
+    }
+
+    function getFirstArticleId() {
+      const link = document.querySelector('.site-main a[href^="/article/"]');
+      if (!link) return '';
+      const match = link.getAttribute('href').match(/\/article\/([a-zA-Z0-9-]+)/);
+      return match ? match[1] : '';
+    }
+    let currentLatestId = getFirstArticleId();
+
+    let toastTimer = null;
+    function showToast(message, actionText, actionCallback) {
+      if (!liveToast) return;
+      toastMsg.textContent = message;
+      if (actionText && actionCallback) {
+        toastBtn.textContent = actionText;
+        toastBtn.style.display = 'inline-block';
+        toastBtn.onclick = actionCallback;
+      } else {
+        toastBtn.style.display = 'none';
+      }
+      liveToast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        liveToast.classList.remove('show');
+      }, 5000);
+    }
+
+    function scrollToTopFeed() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (liveToast) liveToast.classList.remove('show');
+    }
+
+    async function refreshFeed(isAuto) {
+      if (manualRefreshBtn) manualRefreshBtn.classList.add('spinning');
+      try {
+        const resp = await fetch(window.location.href, { cache: 'no-store' });
+        if (!resp.ok) throw new Error('Network error');
+        const htmlText = await resp.text();
+        const parser = new DOMParser();
+        const newDoc = parser.parseFromString(htmlText, 'text/html');
+
+        const currentMain = document.querySelector('.site-main');
+        const newMain = newDoc.querySelector('.site-main');
+
+        if (currentMain && newMain) {
+          const newFirstLink = newMain.querySelector('a[href^="/article/"]');
+          const newId = newFirstLink ? (newFirstLink.getAttribute('href').match(/\/article\/([a-zA-Z0-9-]+)/)?.[1] || '') : '';
+
+          if (newId && newId !== currentLatestId) {
+            currentLatestId = newId;
+            currentMain.innerHTML = newMain.innerHTML;
+
+            const newItems = currentMain.querySelectorAll('.stream-hero, .stream-item');
+            newItems.forEach((el, idx) => {
+              if (idx < 3) el.classList.add('new-item-highlight');
+            });
+
+            remainingSeconds = AUTO_UPDATE_INTERVAL;
+            updateCountdownDisplay();
+
+            if (window.scrollY > 350) {
+              showToast('🔔 নতুন সংবাদ যুক্ত হয়েছে!', 'উপরে যান', scrollToTopFeed);
+            } else {
+              showToast('✨ নতুন সংবাদ হালনাগাদ করা হয়েছে!');
+            }
+          } else if (!isAuto) {
+            showToast('✓ সংবাদ তালিকা ইতিমধ্যে আপ-টু-ডেট আছে');
+          }
+        }
+      } catch (err) {
+        console.warn('[live-update] error:', err);
+        if (!isAuto) showToast('⚠️ হালনাগাদ করতে সমস্যা হয়েছে');
+      } finally {
+        if (manualRefreshBtn) manualRefreshBtn.classList.remove('spinning');
+      }
+    }
+
+    // 10-minute timer countdown
+    setInterval(() => {
+      if (remainingSeconds > 0) {
+        remainingSeconds--;
+        updateCountdownDisplay();
+      } else {
+        remainingSeconds = AUTO_UPDATE_INTERVAL;
+        updateCountdownDisplay();
+        refreshFeed(true);
+      }
+    }, 1000);
+
+    // Background silent check every 60s
+    async function checkNewNewsSilently() {
+      try {
+        const category = new URLSearchParams(window.location.search).get('category') || '';
+        const url = '/api/latest-check' + (category ? '?category=' + encodeURIComponent(category) : '');
+        const resp = await fetch(url);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.latest_id && currentLatestId && data.latest_id !== currentLatestId) {
+          refreshFeed(true);
+        }
+      } catch (e) {
+        // Ignore background network errors
+      }
+    }
+    setInterval(checkNewNewsSilently, SILENT_CHECK_INTERVAL);
+
+    if (manualRefreshBtn) {
+      manualRefreshBtn.addEventListener('click', () => {
+        refreshFeed(false);
+      });
+    }
+
+    updateCountdownDisplay();
+  </script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ .Article.Title }} | বাংলা নিউজ</title>
+  <meta name="description" content="{{ .Article.Summary }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Noto+Serif+Bengali:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- ── Top utility bar ──────────────────────────────── -->
+  <div class="site-topbar">
+    <div class="wrap">
+      <div class="topbar-ticker">
+        <span class="label">আজকের দিন</span>
+        <span class="text">{{ todayBanglaDate }} | ঢাকা সংস্করণ</span>
+      </div>
+      <div class="topbar-right">
+        <span>RSS সংগৃহীত ও AI সারসংক্ষেপ</span>
+        <span style="color:#ddd;">|</span>
+        <a href="/admin/login">অ্যাডমিন লগইন</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Header ────────────────────────────────────────── -->
+  <header class="site-header">
+    <div class="wrap site-masthead">
+      <div class="masthead-left">
+        <button class="hamburger-btn" aria-label="মেনু" type="button">☰</button>
+      </div>
+
+      <a href="/" class="site-brand" aria-label="বাংলা নিউজ হোম">
+        <span class="sun">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="5" fill="#fff"/>
+            <line x1="12" y1="1" x2="12" y2="3" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="12" y1="21" x2="12" y2="23" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="1" y1="12" x2="3" y2="12" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="21" y1="12" x2="23" y2="12" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        বাংলা নিউজ
+      </a>
+
+      <div class="masthead-right">
+        <button class="header-btn search" aria-label="খুঁজুন">⌕</button>
+        <a href="/admin/login" class="header-btn">অ্যাডমিন</a>
+      </div>
+    </div>
+
+    <nav class="site-nav" aria-label="সংবাদ বিভাগ">
+      <div class="wrap">
+        <a href="/">সর্বশেষ</a>
+        <a href="/?category=bangladesh">বাংলাদেশ</a>
+        <a href="/?category=international">বিশ্ব</a>
+        <a href="/?category=business">ব্যবসা</a>
+        <a href="/?category=sports">খেলা</a>
+        <a href="/?category=entertainment">বিনোদন</a>
+        <a href="/?category=technology">প্রযুক্তি</a>
+        <a href="/?category=general">সাধারণ</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ── Article Content ───────────────────────────────── -->
+  <main style="background:#fff; padding-bottom: 0;">
+    <div class="wrap">
+      <div class="article-wrap">
+
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" style="font-size:12px; color:#888; margin-bottom:14px; display:flex; gap:6px; align-items:center;">
+          <a href="/" style="color:#888;">হোম</a>
+          <span>›</span>
+          {{ if .Article.Category }}
+          <a href="/?category={{ .Article.Category }}" style="color:#888;">{{ .Article.Category }}</a>
+          <span>›</span>
+          {{ end }}
+          <span style="color:#555;">নিবন্ধ</span>
+        </nav>
+
+        <!-- Kicker / source -->
+        <span class="article-kicker">{{ .Article.SourceName }}</span>
+
+        <!-- Headline -->
+        <h1>{{ .Article.Title }}</h1>
+
+        <!-- Meta bar -->
+        <div class="article-meta-bar">
+          <time datetime="{{ .Article.PublishedAt.Format "2006-01-02T15:04:05Z07:00" }}">
+            🕒 প্রকাশ: {{ banglaFullDateTime .Article.PublishedAt }} · {{ banglaTimeAgo .Article.PublishedAt }}
+          </time>
+          {{ if .Article.Category }}
+          <span class="category-tag">{{ .Article.Category }}</span>
+          {{ end }}
+        </div>
+
+        <!-- Hero image -->
+        {{ if .Article.ImageURL }}
+        <img class="article-hero-img" src="{{ .Article.ImageURL }}" alt="{{ .Article.Title }}" loading="lazy">
+        <p class="article-img-caption">ছবি: {{ .Article.SourceName }}</p>
+        {{ end }}
+
+        <!-- AI Summary -->
+        {{ if .Article.Summary }}
+        <div class="ai-summary-box">
+          <div class="ai-label">
+            <span>✦</span> AI সারসংক্ষেপ
+          </div>
+          <p>{{ stripHTML .Article.Summary }}</p>
+        </div>
+        {{ end }}
+
+        <!-- Article body -->
+        <div class="article-body">{{ safeHTML .Article.Content }}</div>
+
+        <!-- Share bar -->
+        <div class="share-bar">
+          <span>শেয়ার করুন:</span>
+          <a class="share-btn fb" href="https://facebook.com/sharer/sharer.php?u={{ .Article.SourceURL }}" target="_blank" rel="noopener">f Facebook</a>
+          <a class="share-btn tw" href="https://twitter.com/intent/tweet?url={{ .Article.SourceURL }}&text={{ .Article.Title }}" target="_blank" rel="noopener">𝕏 Twitter</a>
+        </div>
+
+        <!-- Source CTA -->
+        <a class="source-cta" href="{{ .Article.SourceURL }}" target="_blank" rel="noopener noreferrer">
+          মূল সংবাদটি পড়ুন <span>→</span>
+        </a>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ── Footer ────────────────────────────────────────── -->
+  <footer class="site-footer" style="margin-top:40px;">
+    <div class="wrap">
+      <div class="footer-top">
+        <div>
+          <div class="footer-brand">বাংলা<span class="dot">●</span>নিউজ</div>
+          <p class="footer-tagline">বাংলাদেশের শীর্ষ সংবাদমাধ্যম থেকে স্বয়ংক্রিয়ভাবে সংগৃহীত ও AI-সংক্ষেপিত সর্বশেষ সংবাদ।</p>
+        </div>
+        <div class="footer-col">
+          <h4>বিভাগ</h4>
+          <ul>
+            <li><a href="/?category=bangladesh">বাংলাদেশ</a></li>
+            <li><a href="/?category=international">বিশ্ব</a></li>
+            <li><a href="/?category=business">ব্যবসা</a></li>
+            <li><a href="/?category=sports">খেলা</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>সাইট</h4>
+          <ul>
+            <li><a href="/">হোম</a></li>
+            <li><a href="/health">Health Check</a></li>
+            <li><a href="/admin/login">অ্যাডমিন</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© বাংলা নিউজ · RSS উৎস থেকে AI-চালিত সংবাদ সংক্ষেপ</span>
+        <div>
+          <a href="#">গোপনীয়তা নীতি</a>
+          <a href="#">যোগাযোগ</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
