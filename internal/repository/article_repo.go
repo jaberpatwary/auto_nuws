@@ -46,6 +46,40 @@ func (r *articleRepository) GetByID(id uuid.UUID) (*domain.Article, error) {
 	return &a, err
 }
 
+// sourcePrioritySQL ranks sources so that:
+//   1 = Prothom Alo (সর্বোচ্চ)
+//   2 = The Daily Star বাংলা
+//   3 = অন্যান্য জাতীয় দৈনিক (ইত্তেফাক, সমকাল, যুগান্তর…)
+//   4 = টিভি/আন্তর্জাতিক/প্রযুক্তি মিডিয়া
+//   5 = ডেইলি বাংলাদেশ (সর্বনিম্ন)
+// একই ৩০ মিনিটের উইন্ডোর মধ্যে এই priority অনুযায়ী সাজানো হবে।
+const sourcePrioritySQL = `
+	CASE
+		WHEN source_name = 'Prothom Alo'            THEN 1
+		WHEN source_name = 'দ্য ডেইলি স্টার বাংলা' THEN 2
+		WHEN source_name IN (
+			'দৈনিক ইত্তেফাক',
+			'দৈনিক সমকাল',
+			'দৈনিক যুগান্তর',
+			'দৈনিক মানবজমিন',
+			'দেশ রূপান্তর',
+			'বিডিনিউজ২৪ বাংলা',
+			'ঢাকা পোস্ট',
+			'বাংলা ট্রিবিউন'
+		) THEN 3
+		WHEN source_name IN (
+			'চ্যানেল আই অনলাইন',
+			'রাইজিংবিডি',
+			'এনটিভি অনলাইন',
+			'BBC News বাংলা',
+			'ডয়চে ভেলে বাংলা',
+			'টেকশহর'
+		) THEN 4
+		WHEN source_name = 'ডেইলি বাংলাদেশ'        THEN 5
+		ELSE 4
+	END
+`
+
 func (r *articleRepository) List(limit, offset int, category, status string) ([]domain.Article, int64, error) {
 	var articles []domain.Article
 	var total int64
@@ -62,7 +96,11 @@ func (r *articleRepository) List(limit, offset int, category, status string) ([]
 		return nil, 0, err
 	}
 
-	err := q.Order("published_at DESC").Limit(limit).Offset(offset).Find(&articles).Error
+	// Sort by: time bucket (30-min windows) DESC, then source priority, then exact time DESC
+	orderSQL := `date_trunc('hour', published_at) + INTERVAL '30 min' * FLOOR(EXTRACT(MINUTE FROM published_at) / 30) DESC, ` +
+		sourcePrioritySQL + `, published_at DESC`
+
+	err := q.Order(orderSQL).Limit(limit).Offset(offset).Find(&articles).Error
 	return articles, total, err
 }
 

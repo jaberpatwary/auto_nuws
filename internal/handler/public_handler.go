@@ -36,6 +36,7 @@ func (h *PublicHandler) Home(c *gin.Context) {
 		"Total":    total,
 		"Page":     page,
 		"Category": category,
+		"HasMore":  int64(page*20) < total,
 	})
 }
 

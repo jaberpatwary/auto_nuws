@@ -105,7 +105,7 @@
 
         <!-- Hero image -->
         {{ if .Article.ImageURL }}
-        <img class="article-hero-img" src="{{ .Article.ImageURL }}" alt="{{ .Article.Title }}" loading="lazy">
+        <img class="article-hero-img" src="{{ .Article.ImageURL }}" alt="{{ .Article.Title }}" loading="lazy" onerror="this.style.display='none';">
         <p class="article-img-caption">ছবি: {{ .Article.SourceName }}</p>
         {{ end }}
 

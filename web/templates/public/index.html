@@ -134,7 +134,11 @@
                 </div>
                 {{ if $a.ImageURL }}
                 <a href="/article/{{ $a.ID }}" class="hero-img">
-                  <img src="{{ $a.ImageURL }}" alt="{{ $a.Title }}" loading="lazy">
+                  <img src="{{ $a.ImageURL }}" alt="{{ $a.Title }}" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=800&auto=format&fit=crop&q=80';">
+                </a>
+                {{ else }}
+                <a href="/article/{{ $a.ID }}" class="hero-img">
+                  <img src="https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=800&auto=format&fit=crop&q=80" alt="{{ $a.Title }}" loading="lazy">
                 </a>
                 {{ end }}
               </div>
@@ -149,7 +153,11 @@
                 </div>
                 {{ if $a.ImageURL }}
                 <a href="/article/{{ $a.ID }}" class="item-img">
-                  <img src="{{ $a.ImageURL }}" alt="{{ $a.Title }}" loading="lazy">
+                  <img src="{{ $a.ImageURL }}" alt="{{ $a.Title }}" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&auto=format&fit=crop&q=80';">
+                </a>
+                {{ else }}
+                <a href="/article/{{ $a.ID }}" class="item-img">
+                  <img src="https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&auto=format&fit=crop&q=80" alt="{{ $a.Title }}" loading="lazy">
                 </a>
                 {{ end }}
               </div>
@@ -168,9 +176,11 @@
             <!-- Pagination -->
             <nav class="load-more-wrap" aria-label="পৃষ্ঠা পরিবর্তন">
               {{ if gt .Page 1 }}
-                <a class="load-more-btn" href="/?page={{ sub .Page 1 }}&category={{ .Category }}" style="margin-right:10px;">← আগের পৃষ্ঠা</a>
+                <a class="load-more-btn" href="/?page={{ sub .Page 1 }}{{ if .Category }}&amp;category={{ .Category }}{{ end }}" style="margin-right:10px;">← আগের পৃষ্ঠা</a>
               {{ end }}
-              <a class="load-more-btn" href="/?page={{ add .Page 1 }}&category={{ .Category }}">পরের পৃষ্ঠা →</a>
+              {{ if .HasMore }}
+              <a class="load-more-btn" href="/?page={{ add .Page 1 }}{{ if .Category }}&amp;category={{ .Category }}{{ end }}">পরের পৃষ্ঠা →</a>
+              {{ end }}
             </nav>
           </div>
 
@@ -214,7 +224,7 @@
               <article class="news-card">
                 {{ if $a.ImageURL }}
                 <a href="/article/{{ $a.ID }}" class="card-img">
-                  <img src="{{ $a.ImageURL }}" alt="{{ $a.Title }}" loading="lazy">
+                  <img src="{{ $a.ImageURL }}" alt="{{ $a.Title }}" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&auto=format&fit=crop&q=80';">
                 </a>
                 {{ else }}
                 <a href="/article/{{ $a.ID }}" class="card-img card-placeholder">
