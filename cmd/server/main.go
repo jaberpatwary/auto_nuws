@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/gin-gonic/gin"
 
 	"bangla-news-aggregator/internal/config"
 	"bangla-news-aggregator/internal/cron"
@@ -40,12 +44,34 @@ func main() {
 	worker := cron.NewWorker(cfg, feedRepo, articleRepo, usageRepo)
 
 	cronCtx, cancelCron := context.WithCancel(context.Background())
-	go worker.Start(cronCtx)
+	workerDone := make(chan struct{})
+	go func() {
+		defer close(workerDone)
+		worker.Start(cronCtx)
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(quit)
 
 	// ---- HTTP handlers & router ----
 	publicH := handler.NewPublicHandler(articleUC)
 	adminH := handler.NewAdminHandler(authUC, articleUC, feedUC, worker, cfg.JWTExpiry)
 	router := handler.NewRouter(authUC, publicH, adminH)
+	if controlToken := os.Getenv("AUTONEWS_CONTROL_TOKEN"); controlToken != "" {
+		router.POST("/_control/shutdown", func(c *gin.Context) {
+			host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+			ip := net.ParseIP(host)
+			provided := c.GetHeader("X-Autonews-Control")
+			if err != nil || ip == nil || !ip.IsLoopback() ||
+				subtle.ConstantTimeCompare([]byte(provided), []byte(controlToken)) != 1 {
+				c.AbortWithStatus(http.StatusNotFound)
+				return
+			}
+			c.JSON(http.StatusAccepted, gin.H{"status": "shutting down"})
+			go func() { quit <- syscall.SIGTERM }()
+		})
+	}
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
@@ -60,12 +86,15 @@ func main() {
 	}()
 
 	// ---- Graceful shutdown ----
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Println("[main] shutting down gracefully...")
 	cancelCron()
+	select {
+	case <-workerDone:
+	case <-time.After(20 * time.Second):
+		log.Println("[main] feed worker shutdown timed out")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

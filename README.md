@@ -127,6 +127,19 @@ Reader/Admin → Cloudflare (optional) → Go/Gin app
                                          └─ RSS worker → Groq → Gemini fallback
 ```
 
+## Start and stop the local app on Windows
+
+Keep PostgreSQL running locally and set `DATABASE_URL` in `.env` to the local database. Then use:
+
+```powershell
+make start
+make stop
+```
+
+`make start` builds and launches the app in the background. The RSS and AI worker runs only while the app is running. `make stop` gracefully cancels the worker, shuts down the app, and stops any Compose app/database containers. The local PostgreSQL Windows service stays running; it does not make AI requests.
+
+Logs and process-control files are written under `.run/` and are ignored by Git.
+
 ## Known limitations
 
 - Password reset-by-email feature নেই; account access হারালে database/operations-এর মাধ্যমে নিরাপদ reset করতে হবে।

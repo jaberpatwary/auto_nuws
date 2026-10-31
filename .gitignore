@@ -2,6 +2,7 @@
 *.exe
 server.exe
 /tmp
+/.run/
 *.log
 .DS_Store
 vendor/
