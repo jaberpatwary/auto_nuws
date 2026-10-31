@@ -84,9 +84,9 @@ func (r *articleRepository) List(limit, offset int, category, status string) ([]
 		return nil, 0, err
 	}
 
-	orderSQL := `published_at DESC, created_at DESC`
-
-	err := q.Order(orderSQL).Limit(limit).Offset(offset).Find(&articles).Error
+	err := q.Select(`articles.*, ROW_NUMBER() OVER (PARTITION BY source_name ORDER BY published_at DESC, created_at DESC) AS source_rank`).
+		Order(`source_rank ASC, published_at DESC, created_at DESC`).
+		Limit(limit).Offset(offset).Find(&articles).Error
 	return articles, total, err
 }
 
@@ -106,8 +106,9 @@ func (r *articleRepository) Search(limit, offset int, query, category, status st
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	orderSQL := `published_at DESC, created_at DESC`
-	err := q.Order(orderSQL).Limit(limit).Offset(offset).Find(&articles).Error
+	err := q.Select(`articles.*, ROW_NUMBER() OVER (PARTITION BY source_name ORDER BY published_at DESC, created_at DESC) AS source_rank`).
+		Order(`source_rank ASC, published_at DESC, created_at DESC`).
+		Limit(limit).Offset(offset).Find(&articles).Error
 	return articles, total, err
 }
 

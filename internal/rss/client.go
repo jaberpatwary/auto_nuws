@@ -116,6 +116,13 @@ func (c *Client) Fetch(ctx context.Context, feedURL string) ([]Item, error) {
 
 		if entry.PublishedParsed != nil {
 			pub := *entry.PublishedParsed
+			now := time.Now()
+			// Daily Bangladesh currently labels Dhaka local RSS times as UTC.
+			// Reinterpret only near-future dates from that publisher as UTC+6.
+			if isDailyBangladeshURL(item.Link) && pub.After(now) && pub.Sub(now) <= 7*time.Hour {
+				bangladeshTime := time.FixedZone("Bangladesh Standard Time", 6*60*60)
+				pub = time.Date(pub.Year(), pub.Month(), pub.Day(), pub.Hour(), pub.Minute(), pub.Second(), pub.Nanosecond(), bangladeshTime)
+			}
 			maxAge := time.Now().Add(-7 * 24 * time.Hour)
 			if pub.Before(maxAge) {
 				pub = maxAge
@@ -318,4 +325,14 @@ func isImageURL(rawURL string) bool {
 func isGoogleNewsURL(rawURL string) bool {
 	parsed, err := url.Parse(rawURL)
 	return err == nil && strings.EqualFold(parsed.Hostname(), "news.google.com")
+}
+
+func isDailyBangladeshURL(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	host = strings.TrimPrefix(host, "www.")
+	return host == "daily-bangladesh.com" || strings.HasSuffix(host, ".daily-bangladesh.com")
 }
