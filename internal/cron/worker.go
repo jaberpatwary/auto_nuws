@@ -52,10 +52,12 @@ func NewWorker(
 func (w *Worker) Start(ctx context.Context) {
 	log.Printf("[cron] worker started, interval=%s, workers=%d", w.cfg.CronInterval, w.cfg.FeedWorkerCount)
 
-	w.RunOnce(ctx)
-
+	// Anchor the recurring schedule to worker startup. Starting the ticker only
+	// after RunOnce makes every slow fetch permanently push the next poll later.
 	ticker := time.NewTicker(w.cfg.CronInterval)
 	defer ticker.Stop()
+
+	w.RunOnce(ctx)
 
 	for {
 		select {
