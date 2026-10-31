@@ -2,11 +2,14 @@ package cron
 
 import (
 	"context"
+	"errors"
+	"html"
 	"log"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"bangla-news-aggregator/internal/ai"
@@ -121,7 +124,7 @@ func (w *Worker) RunOnce(ctx context.Context) {
 	wg.Wait()
 
 	log.Printf(
-		"[cron] run finished in %s: feeds=%d processed=%d saved=%d skipped(dupe)=%d failed=%d",
+		"[cron] run finished in %s: feeds=%d processed=%d saved=%d skipped=%d failed=%d",
 		time.Since(start), len(feeds), processed, saved, skipped, failed,
 	)
 }
@@ -155,6 +158,24 @@ func (w *Worker) processFeed(ctx context.Context, feed domain.FeedSource) (proce
 			skipped++
 			continue
 		}
+		exists, err = w.articleRepo.ExistsByTitleAndDate(item.Title, item.Published)
+		if err != nil {
+			log.Printf("[cron] headline dedupe check failed for %q: %v", item.Title, err)
+			failed++
+			continue
+		}
+		if exists {
+			skipped++
+			continue
+		}
+
+		visibleContent := html.UnescapeString(htmlTagRegex.ReplaceAllString(item.Content, " "))
+		visibleRunes := utf8.RuneCountInString(strings.TrimSpace(visibleContent))
+		if item.ImageURL == "" || visibleRunes < 600 {
+			log.Printf("[cron] skipped incomplete story %q (body=%d chars, image=%t)", item.Title, visibleRunes, item.ImageURL != "")
+			skipped++
+			continue
+		}
 
 		result, attempts := w.aiClient.Summarize(ctx, item.Title, item.Content)
 		for _, attempt := range attempts {
@@ -169,19 +190,27 @@ func (w *Worker) processFeed(ctx context.Context, feed domain.FeedSource) (proce
 			summary = truncate(cleaned, 280)
 		}
 
+		sourceName := feed.Name
+		if item.PublisherName != "" {
+			sourceName = item.PublisherName
+		}
 		article := &domain.Article{
 			Title:       item.Title,
 			Content:     item.Content,
 			Summary:     summary,
 			SourceURL:   item.Link,
-			SourceName:  feed.Name,
+			SourceName:  sourceName,
 			ImageURL:    item.ImageURL,
-			Category:    detectCategory(item.Title, item.Content+" "+summary, feed.Category),
+			Category:    classifyItemCategory(item.Title, item.Categories, feed.Category),
 			Status:      "published",
 			PublishedAt: item.Published,
 		}
 
 		if err := w.articleRepo.Create(article); err != nil {
+			if errors.Is(err, repository.ErrDuplicateArticle) {
+				skipped++
+				continue
+			}
 			log.Printf("[cron] failed to save article %q: %v", item.Title, err)
 			failed++
 			continue
@@ -222,7 +251,7 @@ func truncate(s string, max int) string {
 
 var (
 	sportsKeywords = []string{
-		"ক্রিকেট", "ফুটবল", "খেলা", "ম্যাচ", "মেসি", "রোনালদো", "সাকিব", "তামিম", "শান্ত",
+		"ক্রিকেট", "ফুটবল", "খেলাধুলা", "ম্যাচ", "মেসি", "রোনালদো", "সাকিব", "তামিম", "শান্ত",
 		"মুশফিক", "উইকেট", "রান", "সেঞ্চুরি", "ফিফটি", "গোল", "টাইব্রেকার", "ব্যালন ডি’অর",
 		"বিপিএল", "আইপিএল", "বিশ্বকাপ", "সিরিজ", "টেস্ট", "ওয়ানডে", "টি-টোয়েন্টি", "টি২০",
 		"অলরাউন্ডার", "বোলার", "ব্যাটার", "আম্পায়ার", "ফিফা", "আইসিসি", "লা লিগা",
@@ -270,21 +299,43 @@ func countMatches(text string, keywords []string) int {
 	score := 0
 	lower := strings.ToLower(text)
 	for _, kw := range keywords {
-		if strings.Contains(lower, kw) {
+		// These short words commonly occur inside unrelated Bengali words:
+		// "খেলা" matches "খেলাপি" (loan defaulter), while "রান" matches "ইরান".
+		if kw == "\u0996\u09c7\u09b2\u09be" || kw == "\u099f\u09be\u0995\u09be" || kw == "\u09aa\u09b0\u09bf\u099a\u09be\u09b2\u0995" {
+			continue
+		}
+		// A passing mention of a social platform does not make a story technology news.
+		if kw == "\u09ab\u09c7\u09b8\u09ac\u09c1\u0995" || kw == "\u099f\u09c1\u0987\u099f\u09be\u09b0" || kw == "\u0987\u09a8\u09b8\u09cd\u099f\u09be\u0997\u09cd\u09b0\u09be\u09ae" {
+			continue
+		}
+		if matchesKeyword(lower, kw) {
 			score++
 		}
 	}
 	return score
 }
 
+func matchesKeyword(text, keyword string) bool {
+	if strings.ContainsAny(keyword, " \t") {
+		return strings.Contains(text, keyword)
+	}
+	for _, token := range strings.FieldsFunc(text, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsMark(r) && !unicode.IsNumber(r)
+	}) {
+		if token == keyword || strings.HasPrefix(token, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
 // detectCategory inspects the article text and maps it into one of:
 // "sports", "business", "technology", "entertainment", "international", "bangladesh"
 func detectCategory(title, content, defaultCategory string) string {
-	if defaultCategory != "" && defaultCategory != "general" && defaultCategory != "test" {
-		return defaultCategory
-	}
-
-	text := title + " " + content
+	// Publisher pages often contain related-story lists and navigation text.
+	// Scoring the body let those unrelated terms put stories in the wrong menu.
+	// Headlines provide a much cleaner signal for category placement.
+	text := title
 	type catScore struct {
 		name  string
 		score int
@@ -296,7 +347,7 @@ func detectCategory(title, content, defaultCategory string) string {
 		{"technology", countMatches(text, techKeywords) * 3},
 		{"entertainment", countMatches(text, entertainmentKeywords) * 3},
 		{"international", countMatches(text, intlKeywords) * 2},
-		{"bangladesh", countMatches(text, bangladeshKeywords)},
+		{"bangladesh", countMatches(text, bangladeshKeywords) * 2},
 	}
 
 	bestCat := ""
@@ -308,12 +359,45 @@ func detectCategory(title, content, defaultCategory string) string {
 		}
 	}
 
-	if bestScore >= 1 {
+	if bestScore >= 2 {
 		return bestCat
 	}
 
-	if defaultCategory != "" && defaultCategory != "general" {
+	defaultCategory = strings.ToLower(strings.TrimSpace(defaultCategory))
+	switch defaultCategory {
+	case "bangladesh", "international", "business", "sports", "technology", "entertainment", "general":
 		return defaultCategory
+	}
+	return "general"
+}
+
+// ClassifyCategory exposes the same category rules to one-off data backfills.
+func ClassifyCategory(title, content, defaultCategory string) string {
+	return detectCategory(title, content, defaultCategory)
+}
+
+func classifyItemCategory(title string, feedCategories []string, defaultCategory string) string {
+	hasBangladeshLabel := false
+	for _, raw := range feedCategories {
+		label := strings.ToLower(strings.TrimSpace(raw))
+		switch {
+		case strings.Contains(label, "sport"), strings.Contains(label, "খেলা"), strings.Contains(label, "ক্রিকেট"), strings.Contains(label, "ফুটবল"):
+			return "sports"
+		case strings.Contains(label, "business"), strings.Contains(label, "economy"), strings.Contains(label, "ব্যবসা"), strings.Contains(label, "বাণিজ্য"), strings.Contains(label, "অর্থনীতি"):
+			return "business"
+		case strings.Contains(label, "technology"), strings.Contains(label, "tech"), strings.Contains(label, "প্রযুক্তি"), strings.Contains(label, "বিজ্ঞান"):
+			return "technology"
+		case strings.Contains(label, "entertainment"), strings.Contains(label, "বিনোদন"), strings.Contains(label, "বলিউড"), strings.Contains(label, "ঢালিউড"):
+			return "entertainment"
+		case strings.Contains(label, "international"), strings.Contains(label, "world"), strings.Contains(label, "আন্তর্জাতিক"), strings.Contains(label, "বিশ্ব"), strings.Contains(label, "ভারত"):
+			return "international"
+		case strings.Contains(label, "bangladesh"), strings.Contains(label, "বাংলাদেশ"), strings.Contains(label, "জাতীয়"), strings.Contains(label, "রাজনীতি"):
+			hasBangladeshLabel = true
+		}
+	}
+	category := detectCategory(title, "", defaultCategory)
+	if category != "general" || !hasBangladeshLabel {
+		return category
 	}
 	return "bangladesh"
 }

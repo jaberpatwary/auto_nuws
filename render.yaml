@@ -21,7 +21,21 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: openrouter/free
+      - key: SAMBANOVA_API_KEY
+        sync: false
+      - key: SAMBANOVA_MODEL
+        value: Meta-Llama-3.3-70B-Instruct
+      - key: COHERE_API_KEY
+        sync: false
+      - key: COHERE_MODEL
+        value: command-a-03-2025
       - key: CRON_INTERVAL
-        value: 1h
+        value: 10m
       - key: FEED_WORKER_COUNT
         value: 5

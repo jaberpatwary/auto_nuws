@@ -3,6 +3,7 @@ package usecase
 import (
 	"errors"
 	"github.com/google/uuid"
+	"strings"
 
 	"bangla-news-aggregator/internal/domain"
 	"bangla-news-aggregator/internal/repository"
@@ -10,6 +11,7 @@ import (
 
 type ArticleUsecase interface {
 	List(page, pageSize int, category, status string) ([]domain.Article, int64, error)
+	Search(page, pageSize int, query, category, status string) ([]domain.Article, int64, error)
 	GetByID(id uuid.UUID) (*domain.Article, error)
 	Delete(id uuid.UUID) error
 	UpdateStatus(id uuid.UUID, status string) error
@@ -32,6 +34,23 @@ func (u *articleUsecase) List(page, pageSize int, category, status string) ([]do
 	}
 	offset := (page - 1) * pageSize
 	return u.repo.List(pageSize, offset, category, status)
+}
+
+func (u *articleUsecase) Search(page, pageSize int, query, category, status string) ([]domain.Article, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	query = strings.TrimSpace(query)
+	if len([]rune(query)) > 100 {
+		query = string([]rune(query)[:100])
+	}
+	if query == "" {
+		return u.List(page, pageSize, category, status)
+	}
+	return u.repo.Search(pageSize, (page-1)*pageSize, query, category, status)
 }
 
 func (u *articleUsecase) GetByID(id uuid.UUID) (*domain.Article, error) {

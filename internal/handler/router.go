@@ -5,17 +5,78 @@ import (
 	"html"
 	"html/template"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gin-gonic/gin"
+	xhtml "golang.org/x/net/html"
 
 	"bangla-news-aggregator/internal/usecase"
 )
 
 var htmlTagRegex = regexp.MustCompile(`<[^>]*>`)
+
+// sanitizeArticleHTML keeps basic article formatting while removing active
+// content from untrusted RSS markup before it is rendered as HTML.
+func sanitizeArticleHTML(input string) template.HTML {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(input))
+	if err != nil {
+		return template.HTML(template.HTMLEscapeString(input))
+	}
+
+	doc.Find("script,style,iframe,object,embed,form,svg,math,link,meta,base").Remove()
+	allowedTags := map[string]bool{
+		"p": true, "br": true, "div": true, "span": true, "h1": true, "h2": true,
+		"h3": true, "h4": true, "h5": true, "h6": true, "blockquote": true,
+		"ul": true, "ol": true, "li": true, "strong": true, "b": true, "em": true,
+		"i": true, "u": true, "s": true, "a": true, "img": true, "figure": true,
+		"figcaption": true, "table": true, "thead": true, "tbody": true,
+		"tr": true, "th": true, "td": true, "hr": true, "pre": true, "code": true,
+	}
+	doc.Find("body *").Each(func(_ int, selection *goquery.Selection) {
+		node := selection.Get(0)
+		if !allowedTags[node.Data] {
+			selection.ReplaceWithSelection(selection.Contents())
+			return
+		}
+		attrs := append([]xhtml.Attribute(nil), node.Attr...)
+		node.Attr = nil
+		for _, attr := range attrs {
+			name := strings.ToLower(attr.Key)
+			if strings.HasPrefix(name, "on") || name == "style" || name == "srcdoc" {
+				continue
+			}
+			switch name {
+			case "href", "src":
+				u := strings.TrimSpace(attr.Val)
+				if strings.ContainsAny(u, "\x00\r\n\t") {
+					continue
+				}
+				parsed, parseErr := url.Parse(u)
+				if parseErr != nil {
+					continue
+				}
+				scheme := strings.ToLower(parsed.Scheme)
+				if scheme != "" && scheme != "http" && scheme != "https" && !(name == "href" && scheme == "mailto") {
+					continue
+				}
+			case "alt", "title", "width", "height", "colspan", "rowspan":
+			default:
+				continue
+			}
+			node.Attr = append(node.Attr, attr)
+		}
+	})
+	clean, err := doc.Find("body").Html()
+	if err != nil {
+		return template.HTML(template.HTMLEscapeString(input))
+	}
+	return template.HTML(clean)
+}
 
 func stripHTML(input string) string {
 	cleaned := htmlTagRegex.ReplaceAllString(input, " ")
@@ -26,6 +87,27 @@ func stripHTML(input string) string {
 	}
 	cleaned = html.UnescapeString(cleaned)
 	return strings.TrimSpace(strings.Join(strings.Fields(cleaned), " "))
+}
+
+func categoryLabel(category string) string {
+	switch category {
+	case "bangladesh":
+		return "বাংলাদেশ"
+	case "international":
+		return "বিশ্ব"
+	case "business":
+		return "ব্যবসা"
+	case "sports":
+		return "খেলা"
+	case "entertainment":
+		return "বিনোদন"
+	case "technology":
+		return "প্রযুক্তি"
+	case "general":
+		return "সাধারণ"
+	default:
+		return category
+	}
 }
 
 func toBanglaDigits(s string) string {
@@ -165,17 +247,18 @@ func NewRouter(
 	})
 
 	r.SetFuncMap(template.FuncMap{
-		"add":                func(a, b int) int { return a + b },
-		"sub":                func(a, b int) int { return a - b },
-		"mul":                func(a, b int) int { return a * b },
-		"div":                func(a, b int) int {
+		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
+		"mul": func(a, b int) int { return a * b },
+		"div": func(a, b int) int {
 			if b == 0 {
 				return 0
 			}
 			return a / b
 		},
-		"safeHTML":           func(s string) template.HTML { return template.HTML(s) },
+		"safeHTML":           sanitizeArticleHTML,
 		"stripHTML":          stripHTML,
+		"categoryLabel":      categoryLabel,
 		"banglaDigits":       toBanglaDigits,
 		"banglaDate":         banglaDateTime,
 		"banglaDateTime":     banglaDateTime,

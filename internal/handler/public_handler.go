@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"bangla-news-aggregator/internal/domain"
 	"bangla-news-aggregator/internal/usecase"
 )
 
@@ -24,8 +25,16 @@ func NewPublicHandler(articleUC usecase.ArticleUsecase) *PublicHandler {
 func (h *PublicHandler) Home(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	category := c.Query("category")
+	query := c.Query("q")
 
-	articles, total, err := h.articleUC.List(page, 20, category, "published")
+	var articles []domain.Article
+	var total int64
+	var err error
+	if query != "" {
+		articles, total, err = h.articleUC.Search(page, 20, query, category, "published")
+	} else {
+		articles, total, err = h.articleUC.List(page, 20, category, "published")
+	}
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"message": "নিবন্ধ লোড করা যায়নি"})
 		return
@@ -36,6 +45,7 @@ func (h *PublicHandler) Home(c *gin.Context) {
 		"Total":    total,
 		"Page":     page,
 		"Category": category,
+		"Query":    query,
 		"HasMore":  int64(page*20) < total,
 	})
 }
@@ -64,8 +74,17 @@ func (h *PublicHandler) HealthCheck(c *gin.Context) {
 
 // LatestCheck returns the ID, title, and count of latest published articles for auto-update checks.
 func (h *PublicHandler) LatestCheck(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	category := c.Query("category")
-	articles, total, err := h.articleUC.List(1, 1, category, "published")
+	query := c.Query("q")
+	var articles []domain.Article
+	var total int64
+	var err error
+	if query != "" {
+		articles, total, err = h.articleUC.Search(page, 1, query, category, "published")
+	} else {
+		articles, total, err = h.articleUC.List(page, 1, category, "published")
+	}
 	if err != nil || len(articles) == 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"total":        total,

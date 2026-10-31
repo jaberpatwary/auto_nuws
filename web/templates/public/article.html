@@ -81,7 +81,7 @@
           <a href="/" style="color:#888;">হোম</a>
           <span>›</span>
           {{ if .Article.Category }}
-          <a href="/?category={{ .Article.Category }}" style="color:#888;">{{ .Article.Category }}</a>
+          <a href="/?category={{ .Article.Category }}" style="color:#888;">{{ categoryLabel .Article.Category }}</a>
           <span>›</span>
           {{ end }}
           <span style="color:#555;">নিবন্ধ</span>
@@ -99,7 +99,7 @@
             🕒 প্রকাশ: {{ banglaFullDateTime .Article.PublishedAt }} · {{ banglaTimeAgo .Article.PublishedAt }}
           </time>
           {{ if .Article.Category }}
-          <span class="category-tag">{{ .Article.Category }}</span>
+          <span class="category-tag">{{ categoryLabel .Article.Category }}</span>
           {{ end }}
         </div>
 

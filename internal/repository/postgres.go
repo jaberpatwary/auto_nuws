@@ -45,6 +45,16 @@ func NewPostgresDB(cfg *config.Config) (*gorm.DB, error) {
 	); err != nil {
 		return nil, err
 	}
+	// Keep repeated RSS entries for the same normalized headline and local
+	// publication day out of the portal, including races across feed workers.
+	if err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_title_bd_date
+		ON articles (
+			lower(regexp_replace(trim(title), '[[:space:][:punct:]]+', ' ', 'g')),
+			((published_at AT TIME ZONE 'Asia/Dhaka')::date)
+		)
+		WHERE title <> ''`).Error; err != nil {
+		return nil, err
+	}
 
 	seedAdmin(db, cfg)
 	seedFeeds(db)
@@ -84,9 +94,10 @@ func seedFeeds(db *gorm.DB) {
 	}
 
 	defaults := []domain.FeedSource{
-		{Name: "Prothom Alo", URL: "https://www.prothomalo.com/feed", Category: "general", Active: true},
-		{Name: "The Daily Star বাংলা", URL: "https://news.google.com/rss/search?q=site:bangla.thedailystar.net&hl=bn&gl=BD&ceid=BD:bn", Category: "general", Active: true},
-		{Name: "Google News বাংলা (Bangladesh)", URL: "https://news.google.com/rss?hl=bn&gl=BD&ceid=BD:bn", Category: "general", Active: true},
+		{Name: "Prothom Alo", URL: "https://www.prothomalo.com/feed", Category: "bangladesh", Active: true},
+		{Name: "RisingBD", URL: "https://www.risingbd.com/rss", Category: "bangladesh", Active: true},
+		{Name: "Techshohor", URL: "https://techshohor.com/feed", Category: "technology", Active: true},
+		{Name: "BD24Live", URL: "https://www.bd24live.com/bangla/feed", Category: "bangladesh", Active: true},
 		{Name: "BBC News বাংলা", URL: "https://feeds.bbci.co.uk/bengali/rss.xml", Category: "international", Active: true},
 	}
 

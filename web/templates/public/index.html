@@ -86,7 +86,7 @@
     <div id="searchDropdown" style="display:none; background:#fafafa; border-bottom:1px solid #e0e0e0; padding:12px 0;">
       <div class="wrap">
         <form onsubmit="handleSearch(event)" style="display:flex; gap:8px; max-width:600px; margin:0 auto;">
-          <input type="text" id="quickSearchInput" placeholder="শিরোনাম বা বিষয় খুঁজুন..." style="flex:1; padding:8px 14px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px;">
+          <input type="text" id="quickSearchInput" value="{{ .Query }}" placeholder="শিরোনাম বা বিষয় খুঁজুন..." style="flex:1; padding:8px 14px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px;">
           <button type="submit" class="header-btn" style="background:var(--red); color:#fff; border-color:var(--red); font-weight:600; padding:0 18px;">অনুসন্ধান</button>
         </form>
       </div>
@@ -101,10 +101,17 @@
       <div class="latest-bar">
         <span class="pill">সর্বশেষ</span>
         {{ if ne .Category "" }}
-          <strong>{{ .Category }}</strong> বিভাগ ·
+          <strong>{{ categoryLabel .Category }}</strong> বিভাগ ·
         {{ end }}
         <span class="sub">স্বয়ংক্রিয় RSS সংগ্রহ ও AI সংক্ষেপ</span>
       </div>
+
+      {{ if .Query }}
+      <div class="search-results-label" style="margin:12px 0;color:#555;">
+        “{{ .Query }}” খোঁজার ফল: {{ banglaDigits (printf "%d" .Total) }}টি সংবাদ
+        <a href="/?{{ if .Category }}category={{ .Category }}{{ end }}" style="margin-left:8px;">খোঁজা মুছুন</a>
+      </div>
+      {{ end }}
 
       {{ if eq (len .Articles) 0 }}
         <div class="empty-feed">
@@ -143,7 +150,7 @@
                 {{ end }}
               </div>
 
-              {{ else if lt $i 8 }}
+              {{ else }}
               <!-- Standard stream item with image -->
               <div class="stream-item">
                 <div class="item-copy">
@@ -162,13 +169,6 @@
                 {{ end }}
               </div>
 
-              {{ else }}
-              <!-- Compact text item -->
-              <div class="stream-text-item">
-                <span class="src-tag">{{ $a.SourceName }}</span>
-                <h3><a href="/article/{{ $a.ID }}">{{ $a.Title }}</a></h3>
-                <time datetime="{{ $a.PublishedAt.Format "2006-01-02T15:04:05Z07:00" }}">🕒 {{ banglaTimeAgo $a.PublishedAt }} · {{ banglaDateTime $a.PublishedAt }}</time>
-              </div>
               {{ end }}
 
             {{ end }}
@@ -176,10 +176,10 @@
             <!-- Pagination -->
             <nav class="load-more-wrap" aria-label="পৃষ্ঠা পরিবর্তন">
               {{ if gt .Page 1 }}
-                <a class="load-more-btn" href="/?page={{ sub .Page 1 }}{{ if .Category }}&amp;category={{ .Category }}{{ end }}" style="margin-right:10px;">← আগের পৃষ্ঠা</a>
+                <a class="load-more-btn" href="/?page={{ sub .Page 1 }}{{ if .Category }}&amp;category={{ .Category }}{{ end }}{{ if .Query }}&amp;q={{ .Query | urlquery }}{{ end }}" style="margin-right:10px;">← আগের পৃষ্ঠা</a>
               {{ end }}
               {{ if .HasMore }}
-              <a class="load-more-btn" href="/?page={{ add .Page 1 }}{{ if .Category }}&amp;category={{ .Category }}{{ end }}">পরের পৃষ্ঠা →</a>
+              <a class="load-more-btn" href="/?page={{ add .Page 1 }}{{ if .Category }}&amp;category={{ .Category }}{{ end }}{{ if .Query }}&amp;q={{ .Query | urlquery }}{{ end }}">পরের পৃষ্ঠা →</a>
               {{ end }}
             </nav>
           </div>
@@ -309,23 +309,12 @@
 
     function handleSearch(e) {
       e.preventDefault();
-      const val = (quickSearchInput ? quickSearchInput.value : '').trim().toLowerCase();
+      const val = (quickSearchInput ? quickSearchInput.value : '').trim();
       if (!val) return;
-      // In-page filter headlines
-      const articles = document.querySelectorAll('.stream-item, .stream-text-item, .news-card, .stream-hero');
-      let found = 0;
-      articles.forEach(el => {
-        const text = el.innerText.toLowerCase();
-        if (text.includes(val)) {
-          el.style.display = '';
-          found++;
-        } else {
-          el.style.display = 'none';
-        }
-      });
-      if (found === 0) {
-        alert('"' + val + '" সম্পর্কিত কোনো সংবাদ খুঁজে পাওয়া যায়নি।');
-      }
+      const params = new URLSearchParams(window.location.search);
+      params.set('q', val);
+      params.delete('page');
+      window.location.href = '/?' + params.toString();
     }
 
     // Mobile nav toggle
@@ -453,9 +442,9 @@
     // Background silent check every 60s
     async function checkNewNewsSilently() {
       try {
-        const category = new URLSearchParams(window.location.search).get('category') || '';
-        const url = '/api/latest-check' + (category ? '?category=' + encodeURIComponent(category) : '');
-        const resp = await fetch(url);
+        const params = new URLSearchParams(window.location.search);
+        const url = '/api/latest-check' + (params.toString() ? '?' + params.toString() : '');
+        const resp = await fetch(url, { cache: 'no-store' });
         if (!resp.ok) return;
         const data = await resp.json();
         if (data.latest_id && currentLatestId && data.latest_id !== currentLatestId) {

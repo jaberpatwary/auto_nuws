@@ -19,6 +19,12 @@ type Config struct {
 	GroqModel        string
 	GeminiAPIKey     string
 	GeminiModel      string
+	OpenRouterAPIKey string
+	OpenRouterModel  string
+	SambaNovaAPIKey  string
+	SambaNovaModel   string
+	CohereAPIKey     string
+	CohereModel      string
 	CronInterval     time.Duration
 	FeedWorkerCount  int
 	AppEnv           string
@@ -41,7 +47,13 @@ func Load() *Config {
 		GroqAPIKey:       getEnv("GROQ_API_KEY", ""),
 		GroqModel:        getEnv("GROQ_MODEL", "openai/gpt-oss-20b"),
 		GeminiAPIKey:     getEnv("GEMINI_API_KEY", ""),
-		GeminiModel:      getEnv("GEMINI_MODEL", "gemini-1.5-flash"),
+		GeminiModel:      getEnv("GEMINI_MODEL", "gemini-3.8-flash"),
+		OpenRouterAPIKey: getEnv("OPENROUTER_API_KEY", ""),
+		OpenRouterModel:  getEnv("OPENROUTER_MODEL", "openrouter/free"),
+		SambaNovaAPIKey:  getEnv("SAMBANOVA_API_KEY", ""),
+		SambaNovaModel:   getEnv("SAMBANOVA_MODEL", "Meta-Llama-3.3-70B-Instruct"),
+		CohereAPIKey:     getEnv("COHERE_API_KEY", ""),
+		CohereModel:      getEnv("COHERE_MODEL", "command-a-03-2025"),
 		CronInterval:     getEnvDuration("CRON_INTERVAL", 1*time.Hour),
 		FeedWorkerCount:  getEnvInt("FEED_WORKER_COUNT", 5),
 		AppEnv:           getEnv("APP_ENV", "development"),

@@ -79,7 +79,7 @@ go run ./cmd/server
 | `GROQ_MODEL` | না | Groq model name |
 | `GEMINI_API_KEY` | না | Gemini API key |
 | `GEMINI_MODEL` | না | Gemini model name |
-| `CRON_INTERVAL` | না | RSS polling interval, default `1h` |
+| `CRON_INTERVAL` | না | RSS polling interval, default `10m` |
 | `FEED_WORKER_COUNT` | না | Parallel feed workers, default `5` |
 | `APP_ENV` | না | Production-এ `production` দিন |
 
