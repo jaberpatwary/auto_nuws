@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -45,10 +46,15 @@ func main() {
 
 	cronCtx, cancelCron := context.WithCancel(context.Background())
 	workerDone := make(chan struct{})
-	go func() {
-		defer close(workerDone)
-		worker.Start(cronCtx)
-	}()
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("DISABLE_BACKGROUND_WORKER")), "true") {
+		close(workerDone)
+		log.Println("[cron] background worker disabled by configuration")
+	} else {
+		go func() {
+			defer close(workerDone)
+			worker.Start(cronCtx)
+		}()
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

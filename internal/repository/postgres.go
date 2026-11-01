@@ -18,22 +18,8 @@ import (
 // runs auto-migration for all domain models, and seeds a default admin user
 // plus a starter set of Bangladeshi RSS feeds if none exist yet.
 func NewPostgresDB(cfg *config.Config) (*gorm.DB, error) {
-	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
-	})
+	db, err := OpenPostgresDB(cfg)
 	if err != nil {
-		return nil, err
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, err
-	}
-	sqlDB.SetMaxOpenConns(10)
-	sqlDB.SetMaxIdleConns(5)
-	sqlDB.SetConnMaxLifetime(30 * time.Minute)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := sqlDB.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
@@ -58,6 +44,31 @@ func NewPostgresDB(cfg *config.Config) (*gorm.DB, error) {
 
 	seedAdmin(db, cfg)
 	seedFeeds(db)
+
+	return db, nil
+}
+
+// OpenPostgresDB connects and pings Postgres without running schema migrations
+// or seeding defaults. Scheduled workers use it against an already-migrated DB.
+func OpenPostgresDB(cfg *config.Config) (*gorm.DB, error) {
+	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Warn),
+	})
+	if err != nil {
+		return nil, err
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := sqlDB.PingContext(ctx); err != nil {
+		return nil, err
+	}
 
 	return db, nil
 }
