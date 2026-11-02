@@ -9,8 +9,8 @@ start:
 	powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1
 
 stop:
-	powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/stop.ps1
 	powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/render-control.ps1 -Action suspend
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/stop.ps1
 
 host-start:
 	powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/render-control.ps1 -Action resume
